@@ -164,54 +164,6 @@ export const loginUser = TryCatch(async(req, res)=>{
 
 });
 
-
-export const verifyOtp = TryCatch(async (req, res) =>{
-
-    const {email, otp} = req.body;
-
-    if(!email || !otp){
-        return res.status(400).json({
-            message: "Please provide all details",
-        });
-    }
-
-    const otpKey =`otp:${email}`
-
-    const storedOtpString = await redisClient.get(otpKey);
-
-    if(!storedOtpString){
-        return res.status(400).json({
-            message: "Otp Expired"
-        });
-    }
-
-    const storedOtp = JSON.parse(storedOtpString)
-
-    if(storedOtp !==otp){
-        return res.status(400).json({
-            message: "Invaid Otp"
-        });
-    }
-
-    await redisClient.del(otpKey);
-
-    let user = await User.findOne({email});
-
-    const token = await generateToken(user._id, res);
-
-    res.status(200).json({
-        message: `Welcome ${user.name}`,
-        user,
-    })
-});
-
-
-export const myProfile = TryCatch(async (req, res) => {
-    const user = req.user;
-    
-    res.json(user);
-});
-
 export const refreshToken = TryCatch(async (req, res) =>{
     const refreshToken = req.cookies.refreshToken;
 
@@ -224,12 +176,15 @@ export const refreshToken = TryCatch(async (req, res) =>{
     const decode = await verifyrefreshToken(refreshToken);
 
     if(!decode){
+        res.clearCookie("refreshToken");
+        res.clearCookie("accessToken");
+        
         return res.status(401).json({
-            message: "Invalid refresh token",
+            message: "Session Expired. Please Login Again.",
         });
         }
 
-        generateAccessToken(decode.id, res);
+        generateAccessToken(decode.id, decode.sessionId, res);
 
         res.status(200).json({
             message: "Token refreshed",
@@ -260,3 +215,95 @@ export const adminController = TryCatch(async(req, res)=>{
         message: "Hellow Admin"
     })
 });
+
+
+
+export const verifyOtp = TryCatch(async (req, res) => {
+  const { email, otp } = req.body;
+
+  if (!email || !otp) {
+    return res.status(400).json({
+      message: "Please provide all details",
+    });
+  }
+
+  const otpKey = `otp:${email}`;
+
+  const storedOtpString = await redisClient.get(
+    otpKey
+  );
+
+  if (!storedOtpString) {
+    return res.status(400).json({
+      message: "OTP Expired",
+    });
+  }
+
+  const storedOtp = JSON.parse(storedOtpString);
+
+  if (storedOtp !== otp) {
+    return res.status(400).json({
+      message: "Invalid OTP",
+    });
+  }
+
+  await redisClient.del(otpKey);
+
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    return res.status(404).json({
+      message: "User not found",
+    });
+  }
+
+  const tokenData = await generateToken(
+    user._id,
+    res
+  );
+
+  res.status(200).json({
+    message: `Welcome ${user.name}`,
+    user,
+    sessionInfo: {
+      sessionId: tokenData.sessionId,
+      loginTime: new Date().toISOString(),
+    },
+  });
+});
+
+export const myProfile = TryCatch(async (
+  req,
+  res
+) => {
+  const user = req.user;
+
+  const sessionId = req.sessionId;
+
+  let sessionInfo = null;
+
+  if (sessionId) {
+    const sessionData = await redisClient.get(
+      `session:${sessionId}`
+    );
+
+    if (sessionData) {
+      const parsedSession = JSON.parse(
+        sessionData
+      );
+
+      sessionInfo = {
+        sessionId,
+        loginTime: parsedSession.createdAt,
+        lastActivity:
+          parsedSession.lastActivity,
+      };
+    }
+  }
+
+  res.status(200).json({
+    user,
+    sessionInfo,
+  });
+});
+

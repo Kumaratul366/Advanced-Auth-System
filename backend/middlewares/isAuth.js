@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { redisClient } from '../index.js';
 import { User } from '../models/User.js';
+import { isSessionActive } from '../config/generateToken.js';
 
 export const isAuth = async(req, res, next) => {
     try {
@@ -14,10 +15,31 @@ export const isAuth = async(req, res, next) => {
 
         const decodedData = jwt.verify(token, process.env.JWT_SECRET);
 
+        if(!decodedData){
+            return res.status(400).json({
+                message: "token expired",
+            });
+        }
+
+        const sessionActive = await isSessionActive(
+            decodedData.id,
+            decodedData.sessionId
+        );
+
+        if(!sessionActive){
+            res.clearCookie("refreshToken");
+            res.clearCookie("accessToken");
+
+            return res.status(401).json({
+                message: "Session Expired. You have been logged in from another device."
+            })
+        }
+
         const cacheUser = await redisClient.get(`user:${decodedData.id}`);
 
         if(cacheUser){
             req.user = JSON.parse(cacheUser);
+            req.sessionId = decodedData.sessionId;
             return next();
         };
 
@@ -33,6 +55,8 @@ export const isAuth = async(req, res, next) => {
         await redisClient.setEx(`user:${user._id}`, 3600, JSON.stringify(user));
 
         req.user = user;
+        req.sessionId = decodedData.sessionId;
+
         next();
 
     } catch (error) {
