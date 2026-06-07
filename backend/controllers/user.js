@@ -213,7 +213,6 @@ export const myProfile = TryCatch(async (req, res) => {
 });
 
 export const refreshToken = TryCatch(async (req, res) =>{
-   console.log("Refresh endpoint hit");  //logssssssssssss
     const refreshToken = req.cookies.refreshToken;
 
     if(!refreshToken){

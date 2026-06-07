@@ -28,7 +28,6 @@ api.interceptors.response.use(
 
             try {
 
-                console.log("Refreshing token...");   //logssssssssssss
                 await api.post("/api/refresh");
 
                 return api(originalRequest);
