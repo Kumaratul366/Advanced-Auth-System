@@ -1,6 +1,6 @@
 import express from 'express';
-import { loginUser, logOutUser, myProfile, refreshToken, registerUser, verifyOtp, verifyUser } from '../controllers/user.js';
-import { isAuth } from '../middlewares/isAuth.js';
+import { adminController, loginUser, logOutUser, myProfile, refreshToken, registerUser, verifyOtp, verifyUser } from '../controllers/user.js';
+import { authorisedAdmis, isAuth } from '../middlewares/isAuth.js';
 
 const router = express.Router();
 
@@ -11,5 +11,6 @@ router.post("/verify-otp", verifyOtp);
 router.get("/me", isAuth, myProfile);
 router.post("/refresh", refreshToken);
 router.post("/logout", isAuth, logOutUser);
+router.get("/admin", isAuth, authorisedAdmis, adminController);
 
 export default router;

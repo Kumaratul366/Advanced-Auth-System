@@ -254,3 +254,9 @@ export const logOutUser = TryCatch(async (req, res) =>{
 
 });
 
+
+export const adminController = TryCatch(async(req, res)=>{
+    return res.json({
+        message: "Hellow Admin"
+    })
+});
